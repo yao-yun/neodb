@@ -239,7 +239,7 @@ class DoubanImporter:
             print(f"{self.user} | match/fetch {url} failed")
             return
         mark = Mark(self.user, item)
-        if self.mode == 1 and (
+        if self.mode == 0 and (
             mark.shelf_type == shelf_type
             or mark.shelf_type == ShelfType.COMPLETE
             or (
@@ -247,10 +247,12 @@ class DoubanImporter:
                 and shelf_type == ShelfType.WISHLIST
             )
         ):
+            print("-", end="", flush=True)
             return 2
         mark.update(
             shelf_type, comment, rating_grade, self.visibility, created_time=time
         )
+        print("+", end="", flush=True)
         if tags:
             TagManager.tag_item_by_user(item, self.user, tags)
         return 1
@@ -305,7 +307,8 @@ class DoubanImporter:
                 item.last_editor = self.user
                 item.save()
             else:
-                print(f"matched {url}")
+                # print(f"matched {url}")
+                print(".", end="", flush=True)
         except Exception as e:
             print(f"fetching exception: {url} {e}")
             _logger.error(f"scrape failed: {url}", exc_info=e)
