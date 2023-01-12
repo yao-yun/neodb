@@ -67,6 +67,23 @@ class DoubanImporter:
         self.user.preference.import_status["douban_failed"] = self.failed
         self.user.preference.save(update_fields=["import_status"])
 
+    @classmethod
+    def reset(cls, user):
+        user.preference.import_status["douban_pending"] = 0
+        user.preference.save(update_fields=["import_status"])
+
+    @classmethod
+    def redo(cls, user):
+        file = user.preference.import_status["douban_file"]
+        imp = cls(
+            user,
+            user.preference.import_status["douban_visibility"],
+            user.preference.import_status["douban_mode"],
+        )
+        imp.file = file
+        jid = f"Douban_{user.id}_{os.path.basename(file)}_redo"
+        django_rq.get_queue("import").enqueue(imp.import_from_file_task, job_id=jid)
+
     def import_from_file(self, uploaded_file):
         try:
             wb = openpyxl.open(
@@ -88,7 +105,6 @@ class DoubanImporter:
             )
         except Exception:
             return False
-        # self.import_from_file_task(file, user, visibility)
         return True
 
     mark_sheet_config = {
