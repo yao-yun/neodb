@@ -288,7 +288,7 @@ def collection_edit(request, collection_uuid=None):
         )
     elif request.method == "POST":
         form = (
-            CollectionForm(request.POST, instance=collection)
+            CollectionForm(request.POST, request.FILES, instance=collection)
             if collection
             else CollectionForm(request.POST)
         )

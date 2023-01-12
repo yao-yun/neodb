@@ -16,7 +16,7 @@ from django.contrib.contenttypes.models import ContentType
 import django.dispatch
 import uuid
 import re
-from catalog.common.utils import DEFAULT_ITEM_COVER, item_cover_path
+from catalog.common.utils import DEFAULT_ITEM_COVER, piece_cover_path
 from django.utils.baseconv import base62
 from django.db.models import Q
 from catalog.models import *
@@ -661,7 +661,7 @@ class Collection(List):
     title = models.CharField(_("标题"), max_length=1000, default="")
     brief = models.TextField(_("简介"), blank=True, default="")
     cover = models.ImageField(
-        upload_to=item_cover_path, default=DEFAULT_ITEM_COVER, blank=True
+        upload_to=piece_cover_path, default=DEFAULT_ITEM_COVER, blank=True
     )
     items = models.ManyToManyField(
         Item, through="CollectionMember", related_name="collections"
