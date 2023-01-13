@@ -66,14 +66,11 @@ class Game(Item):
     platform = jsondata.ArrayField(
         verbose_name=_("平台"),
         base_field=models.CharField(blank=True, default="", max_length=200),
-        null=True,
-        blank=True,
         default=list,
     )
 
     official_site = jsondata.CharField(
-        verbose_name=_("官方网站"),
-        default="",
+        verbose_name=_("官方网站"), max_length=1000, null=True, blank=True
     )
 
     @classmethod
