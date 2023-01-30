@@ -1,3 +1,4 @@
+from typing import cast
 import mistune
 import re
 
@@ -18,14 +19,14 @@ _mistune_plugins = [
 _markdown = mistune.create_markdown(plugins=_mistune_plugins)
 
 
-def render_md(s):
+def render_md(s) -> str:
     # s = "\n".join(
     #     [
     #         re.sub(r"^(\u2003+)", lambda s: "&emsp;" * len(s[0]), line)
     #         for line in s.split("\n")
     #     ]
     # )
-    return _markdown(s)
+    return cast(str, _markdown(s))
 
 
 def render_text(s):

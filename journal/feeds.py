@@ -1,5 +1,5 @@
 from django.contrib.syndication.views import Feed
-from markdown import markdown
+from journal.renderers import render_md
 import mimetypes
 from .models import *
 from django.conf import settings
@@ -33,7 +33,7 @@ class ReviewFeed(Feed):
         target_html = (
             f'<p><a href="{item.item.absolute_url}">{item.item.title}</a></p>\n'
         )
-        html = markdown(item.body)
+        html = render_md(item.body)
         return target_html + html
 
     # item_link is only needed if NewsItem has no get_absolute_url method.
