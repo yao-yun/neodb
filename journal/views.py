@@ -422,6 +422,7 @@ def review_edit(request, item_uuid, review_uuid=None):
             if review
             else ReviewForm(request.POST)
         )
+        print(form.instance.body)
         if form.is_valid():
             if not review:
                 form.instance.owner = request.user

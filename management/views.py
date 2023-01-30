@@ -6,8 +6,6 @@ from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.views.generic import *
 from django.views.generic.edit import ModelFormMixin
-from markdown import markdown
-import re
 
 
 # https://docs.djangoproject.com/en/3.1/topics/class-based-views/intro/

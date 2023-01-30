@@ -22,8 +22,10 @@ from django.utils.baseconv import base62
 from django.db.models import Q
 from catalog.models import *
 from django.contrib.contenttypes.models import ContentType
-from markdown import markdown
+from .renderers import render_md
 from catalog.common import jsondata
+
+from journal import renderers
 
 _logger = logging.getLogger(__name__)
 
@@ -211,7 +213,7 @@ class Review(Content):
 
     @property
     def html_content(self):
-        return markdown(self.body)
+        return render_md(self.body)
 
     @cached_property
     def rating_grade(self):
@@ -692,12 +694,12 @@ class Collection(List):
 
     @property
     def html(self):
-        html = markdown(self.brief)
+        html = render_md(self.brief)
         return html
 
     @property
     def plain_description(self):
-        html = markdown(self.brief)
+        html = render_md(self.brief)
         return _RE_HTML_TAG.sub(" ", html)
 
     def is_featured_by_user(self, user):

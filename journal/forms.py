@@ -18,7 +18,7 @@ class ReviewForm(forms.ModelForm):
         }
 
     title = forms.CharField(label=_("评论标题"))
-    body = MarkdownxFormField(label=_("评论正文 (Markdown)"))
+    body = MarkdownxFormField(label=_("评论正文 (Markdown)"), strip=False)
     share_to_mastodon = forms.BooleanField(
         label=_("分享到联邦网络"), initial=False, required=False
     )
