@@ -15,6 +15,7 @@ _mistune_plugins = [
     "subscript",
     "math",
     "spoiler",
+    "ruby",
 ]
 _markdown = mistune.create_markdown(plugins=_mistune_plugins)
 

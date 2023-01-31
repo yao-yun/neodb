@@ -153,6 +153,9 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 
+MARKDOWNX_MARKDOWNIFY_FUNCTION = "journal.renderers.render_md"
+
+
 # Internationalization
 # https://docs.djangoproject.com/en/3.0/topics/i18n/
 
