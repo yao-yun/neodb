@@ -7,7 +7,6 @@ import journal.mixins
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [

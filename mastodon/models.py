@@ -18,6 +18,7 @@ class MastodonApplication(models.Model):
 
     is_proxy = models.BooleanField(default=False, blank=True)
     proxy_to = models.CharField(max_length=100, blank=True, default="")
+
     # website
     # name
     # redirect_uris

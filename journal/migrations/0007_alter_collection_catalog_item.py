@@ -5,7 +5,6 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("catalog", "0002_initial"),
         ("journal", "0006_auto_20230114_2139"),

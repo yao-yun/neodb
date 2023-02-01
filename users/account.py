@@ -27,6 +27,7 @@ import json
 from django.contrib import messages
 from journal.models import remove_data_by_user
 
+
 # the 'login' page that user can see
 def login(request):
     if request.method == "GET":

@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from requests.exceptions import Timeout
 from django.core.exceptions import ObjectDoesNotExist
 
+
 # Register your models here.
 @admin.register(MastodonApplication)
 class MastodonApplicationModelAdmin(admin.ModelAdmin):
