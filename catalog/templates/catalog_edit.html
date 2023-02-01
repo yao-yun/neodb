@@ -49,14 +49,12 @@
               {% endfor %}
             </div>
 
-            {% if request.user.is_staff %}
+            {% if item.class_name == "movie" or item.class_name == "tvshow" %}
             <div class="aside-section-wrapper">
               <div class="action-panel">
-
-                {% if item.class_name == "movie" or item.class_name == "tvshow" %}
                 <div class="action-panel__label">{% trans '切换分类' %} </div>
                 <div class="action-panel__button-group">
-                  <form method="post" action="{% url 'catalog:recast' item.url_path item.uuid %}" onsubmit="return confirm('Confirm updating?');">
+                  <form method="post" action="{% url 'catalog:recast' item.url_path item.uuid %}" onsubmit="return confirm('确认切换吗？');">
                     {% csrf_token %}
                     {% if item.class_name == "movie" %}
                     <input type="hidden" value="tvshow" name="class">
@@ -68,8 +66,15 @@
                     {% endif %}
                   </form>
                 </div>
-                {% endif %}
+              </div>
+            </div>
+            {% endif %}
 
+            {% if request.user.is_staff %}
+            <div class="aside-section-wrapper">
+              <div class="action-panel">
+
+\
                 <div class="action-panel__label">{% trans '合并到另一条目' %} </div>
                 <div class="action-panel__button-group">
                   <form method="post" action="{% url 'catalog:merge' item.url_path item.uuid %}" onsubmit="return confirm('Confirm merging?');">

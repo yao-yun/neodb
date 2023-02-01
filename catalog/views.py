@@ -175,8 +175,6 @@ def delete(request, item_path, item_uuid):
 def recast(request, item_path, item_uuid):
     if request.method != "POST":
         return HttpResponseBadRequest()
-    if not request.user.is_staff:
-        raise PermissionDenied()
     item = get_object_or_404(Item, uid=base62.decode(item_uuid))
     cls = request.POST.get("class")
     model = TVShow if cls == "tvshow" else (Movie if cls == "movie" else None)
