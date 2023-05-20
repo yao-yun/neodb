@@ -11,7 +11,7 @@ from django.core.paginator import Paginator
 from catalog.common.models import ExternalResource, IdealIdTypes
 from .models import *
 from django.views.decorators.clickjacking import xframe_options_exempt
-from journal.models import Mark, ShelfMember, Review, query_item_category
+from journal.models import Mark, ShelfMember, Review, Comment, query_item_category
 from journal.models import (
     query_visible,
     query_following,
@@ -85,32 +85,28 @@ def retrieve(request, item_path, item_uuid):
         )
     mark = None
     review = None
-    mark_list = None
-    review_list = None
+    my_collections = []
     collection_list = []
     shelf_types = [(n[1], n[2]) for n in iter(ShelfTypeNames) if n[0] == item.category]
     if request.user.is_authenticated:
         visible = query_visible(request.user)
         mark = Mark(request.user, item)
         review = mark.review
+        my_collections = item.collections.all().filter(owner=request.user)
         collection_list = (
             item.collections.all()
+            .exclude(owner=request.user)
             .filter(visible)
             .annotate(like_counts=Count("likes"))
             .order_by("-like_counts")
         )
-        mark_query = (
-            ShelfMember.objects.filter(item=item)
-            .filter(visible)
-            .order_by("-created_time")
+    else:
+        collection_list = (
+            item.collections.all()
+            .filter(visibility=0)
+            .annotate(like_counts=Count("likes"))
+            .order_by("-like_counts")
         )
-        mark_list = [member.mark for member in mark_query[:NUM_REVIEWS_ON_ITEM_PAGE]]
-        review_list = (
-            Review.objects.filter(item=item)
-            .filter(visible)
-            .order_by("-created_time")[:NUM_REVIEWS_ON_ITEM_PAGE]
-        )
-
     return render(
         request,
         item.class_name + ".html",
@@ -119,8 +115,7 @@ def retrieve(request, item_path, item_uuid):
             "focus_item": focus_item,
             "mark": mark,
             "review": review,
-            "mark_list": mark_list,
-            "review_list": review_list,
+            "my_collections": my_collections,
             "collection_list": collection_list,
             "shelf_types": shelf_types,
         },
@@ -273,7 +268,7 @@ def episode_data(request, item_uuid):
     if request.GET.get("last"):
         qs = qs.filter(pub_date__lt=request.GET.get("last"))
     return render(
-        request, "podcast_episode_data.html", {"item": item, "episodes": qs[:10]}
+        request, "podcast_episode_data.html", {"item": item, "episodes": qs[:5]}
     )
 
 
@@ -326,27 +321,62 @@ def review_list(request, item_path, item_uuid):
 
 
 @login_required
+def comments(request, item_path, item_uuid):
+    item = get_object_or_404(Item, uid=get_uuid_or_404(item_uuid))
+    if not item:
+        raise Http404()
+    queryset = Comment.objects.filter(item=item).order_by("-created_time")
+    queryset = queryset.filter(query_visible(request.user))
+    before_time = request.GET.get("last")
+    if before_time:
+        queryset = queryset.filter(created_time__lte=before_time)
+    return render(
+        request,
+        "item_comments.html",
+        {
+            "comments": queryset[:11],
+        },
+    )
+
+
+@login_required
+def reviews(request, item_path, item_uuid):
+    item = get_object_or_404(Item, uid=get_uuid_or_404(item_uuid))
+    if not item:
+        raise Http404()
+    queryset = Review.objects.filter(item=item).order_by("-created_time")
+    queryset = queryset.filter(query_visible(request.user))
+    before_time = request.GET.get("last")
+    if before_time:
+        queryset = queryset.filter(created_time__lte=before_time)
+    return render(
+        request,
+        "item_reviews.html",
+        {
+            "reviews": queryset[:11],
+        },
+    )
+
+
 def discover(request):
     if request.method != "GET":
         raise BadRequest()
     user = request.user
     if user.is_authenticated:
         layout = user.get_preference().discover_layout
-        top_tags = user.tag_manager.all_tags[:10]
     else:
         layout = []
-        top_tags = []
 
-    cache_key = "public_gallery_list"
+    cache_key = "public_gallery"
     gallery_list = cache.get(cache_key, [])
 
-    for gallery in gallery_list:
-        ids = (
-            random.sample(gallery["item_ids"], 10)
-            if len(gallery["item_ids"]) > 10
-            else gallery["item_ids"]
-        )
-        gallery["items"] = Item.objects.filter(id__in=ids)
+    # for gallery in gallery_list:
+    #     ids = (
+    #         random.sample(gallery["item_ids"], 10)
+    #         if len(gallery["item_ids"]) > 10
+    #         else gallery["item_ids"]
+    #     )
+    #     gallery["items"] = Item.objects.filter(id__in=ids)
 
     if user.is_authenticated:
         podcast_ids = [
@@ -355,41 +385,39 @@ def discover(request):
                 ShelfType.PROGRESS, ItemCategory.Podcast
             )
         ]
-        episodes = PodcastEpisode.objects.filter(program_id__in=podcast_ids).order_by(
-            "-pub_date"
-        )[:5]
-        gallery_list.insert(
-            0,
-            {
-                "name": "my_recent_podcasts",
-                "title": "在听播客的近期更新",
-                "items": episodes,
-            },
+        recent_podcast_episodes = PodcastEpisode.objects.filter(
+            program_id__in=podcast_ids
+        ).order_by("-pub_date")[:10]
+        books_in_progress = Edition.objects.filter(
+            id__in=[
+                p.item_id
+                for p in user.shelf_manager.get_members(
+                    ShelfType.PROGRESS, ItemCategory.Book
+                ).order_by("-created_time")[:10]
+            ]
         )
-        # books = Edition.objects.filter(
-        #     id__in=[
-        #         p.item_id
-        #         for p in user.shelf_manager.get_members(
-        #             ShelfType.PROGRESS, ItemCategory.Book
-        #         ).order_by("-created_time")[:10]
-        #     ]
-        # )
-        # gallery_list.insert(
-        #     0,
-        #     {
-        #         "name": "my_books_inprogress",
-        #         "title": "正在读的书",
-        #         "items": books,
-        #     },
-        # )
+        tvshows_in_progress = Item.objects.filter(
+            id__in=[
+                p.item_id
+                for p in user.shelf_manager.get_members(
+                    ShelfType.PROGRESS, ItemCategory.TV
+                ).order_by("-created_time")[:10]
+            ]
+        )
+    else:
+        recent_podcast_episodes = []
+        books_in_progress = []
+        tvshows_in_progress = []
 
     return render(
         request,
         "discover.html",
         {
             "user": user,
-            "top_tags": top_tags,
             "gallery_list": gallery_list,
+            "recent_podcast_episodes": recent_podcast_episodes,
+            "books_in_progress": books_in_progress,
+            "tvshows_in_progress": tvshows_in_progress,
             "layout": layout,
         },
     )

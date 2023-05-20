@@ -61,7 +61,12 @@ def like(request, piece_uuid):
         return render(
             request,
             "like_stats.html",
-            {"piece": piece, "liked": True},
+            {
+                "piece": piece,
+                "liked": True,
+                "label": request.GET.get("label"),
+                "icon": request.GET.get("icon"),
+            },
         )
     return HttpResponse(_checkmark)
 
@@ -80,7 +85,12 @@ def unlike(request, piece_uuid):
         return render(
             request,
             "like_stats.html",
-            {"piece": piece, "liked": False},
+            {
+                "piece": piece,
+                "liked": False,
+                "label": request.GET.get("label"),
+                "icon": request.GET.get("icon"),
+            },
         )
     return HttpResponse(_checkmark)
 
@@ -135,7 +145,7 @@ def mark(request, item_uuid):
         shelf_type = request.GET.get("shelf_type", mark.shelf_type)
         return render(
             request,
-            "mark.html",
+            "mark2.html" if request.GET.get("new", 0) else "mark.html",
             {
                 "item": item,
                 "mark": mark,
@@ -281,17 +291,19 @@ def collection_retrieve(request, collection_uuid):
         if request.user.is_authenticated
         else False
     )
-    is_featured = request.user.is_authenticated and collection.is_featured_by_user(
-        request.user
+    featured_since = (
+        collection.featured_by_user_since(request.user)
+        if request.user.is_authenticated
+        else None
     )
     available_as_featured = (
         request.user.is_authenticated
         and (following or request.user == collection.owner)
-        and not is_featured
+        and not featured_since
         and collection.members.all().exists()
     )
     stats = {}
-    if is_featured:
+    if featured_since:
         stats = collection.get_stats_for_user(request.user)
         stats["wishlist_deg"] = (
             stats["wishlist"] / stats["total"] * 360 if stats["total"] else 0
@@ -311,11 +323,12 @@ def collection_retrieve(request, collection_uuid):
             "following": following,
             "stats": stats,
             "available_as_featured": available_as_featured,
-            "is_featured": is_featured,
+            "featured_since": featured_since,
         },
     )
 
 
+@login_required
 def collection_add_featured(request, collection_uuid):
     if request.method != "POST":
         raise BadRequest()
@@ -326,6 +339,7 @@ def collection_add_featured(request, collection_uuid):
     return HttpResponseRedirect(request.META.get("HTTP_REFERER"))
 
 
+@login_required
 def collection_remove_featured(request, collection_uuid):
     if request.method != "POST":
         raise BadRequest()
@@ -340,6 +354,7 @@ def collection_remove_featured(request, collection_uuid):
     return HttpResponseRedirect(request.META.get("HTTP_REFERER"))
 
 
+@login_required
 def collection_share(request, collection_uuid):
     collection = (
         get_object_or_404(Collection, uid=get_uuid_or_404(collection_uuid))
@@ -361,6 +376,7 @@ def collection_share(request, collection_uuid):
         raise BadRequest()
 
 
+@login_required
 def collection_retrieve_items(request, collection_uuid, edit=False, msg=None):
     collection = get_object_or_404(Collection, uid=get_uuid_or_404(collection_uuid))
     if not collection.is_visible_to(request.user):
@@ -426,6 +442,18 @@ def collection_move_item(request, direction, collection_uuid, item_uuid):
 
 
 @login_required
+def collection_update_member_order(request, collection_uuid):
+    if request.method != "POST":
+        raise BadRequest()
+    collection = get_object_or_404(Collection, uid=get_uuid_or_404(collection_uuid))
+    if not collection.is_editable_by(request.user):
+        raise PermissionDenied()
+    ordered_member_ids = [int(i) for i in request.POST.get("member_ids").split(",")]
+    collection.update_member_order(ordered_member_ids)
+    return collection_retrieve_items(request, collection_uuid, True)
+
+
+@login_required
 def collection_update_item_note(request, collection_uuid, item_uuid):
     collection = get_object_or_404(Collection, uid=get_uuid_or_404(collection_uuid))
     if not collection.is_editable_by(request.user):
@@ -460,6 +488,8 @@ def collection_edit(request, collection_uuid=None):
         raise PermissionDenied()
     if request.method == "GET":
         form = CollectionForm(instance=collection) if collection else CollectionForm()
+        if request.GET.get("title"):
+            form.instance.title = request.GET.get("title")
         return render(
             request, "collection_edit.html", {"form": form, "collection": collection}
         )
@@ -546,8 +576,6 @@ def review_edit(request, item_uuid, review_uuid=None):
                 )
             form.save()
             if form.cleaned_data["share_to_mastodon"]:
-                form.instance.save = lambda **args: None
-                form.instance.shared_link = None
                 if not share_review(form.instance):
                     return render_relogin(request)
             return redirect(
@@ -672,7 +700,7 @@ def user_tag_edit(request):
             msg.error(request.user, _("标签已存在"))
             return HttpResponseRedirect(request.META.get("HTTP_REFERER"))
         tag.title = tag_title
-        tag.visibility = request.POST.get("visibility", 0)
+        tag.visibility = int(request.POST.get("visibility", 0))
         tag.visibility = 0 if tag.visibility == 0 else 2
         tag.save()
         msg.info(request.user, _("标签已修改"))
@@ -756,6 +784,7 @@ def user_liked_collection_list(request, user_name):
         {
             "user": user,
             "collections": collections,
+            "liked": True,
         },
     )
 
@@ -813,7 +842,7 @@ def profile(request, user_name):
             shelf_list[category][shelf_type] = {
                 "title": user.shelf_manager.get_label(shelf_type, category),
                 "count": members.count(),
-                "members": members[:5].prefetch_related("item"),
+                "members": members[:10].prefetch_related("item"),
             }
         reviews = (
             Review.objects.filter(owner=user)
@@ -824,7 +853,7 @@ def profile(request, user_name):
         shelf_list[category]["reviewed"] = {
             "title": "评论过的" + category.label,
             "count": reviews.count(),
-            "members": reviews[:5].prefetch_related("item"),
+            "members": reviews[:10].prefetch_related("item"),
         }
     collections = (
         Collection.objects.filter(owner=user).filter(qv).order_by("-created_time")
@@ -836,19 +865,21 @@ def profile(request, user_name):
     )
     if user != request.user:
         liked_collections = liked_collections.filter(query_visible(request.user))
-
+        top_tags = user.tag_manager.public_tags[:10]
+    else:
+        top_tags = user.tag_manager.all_tags[:10]
     return render(
         request,
         "profile.html",
         {
             "user": user,
-            "top_tags": user.tag_manager.all_tags[:10],
+            "top_tags": top_tags,
             "shelf_list": shelf_list,
-            "collections": collections[:5],
+            "collections": collections[:10],
             "collections_count": collections.count(),
             "liked_collections": [
                 Collection.objects.get(id=i)
-                for i in liked_collections.order_by("-edited_time")[:5]
+                for i in liked_collections.order_by("-edited_time")[:10]
             ],
             "liked_collections_count": liked_collections.count(),
             "layout": user.get_preference().profile_layout,

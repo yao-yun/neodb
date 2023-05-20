@@ -80,6 +80,7 @@ def fetch(request, url, is_refetch: bool = False, site: AbstractSite = None):
         "fetch_pending.html",
         {
             "site": site,
+            "sites": SiteName.labels,
             "job_id": job_id,
         },
     )
@@ -99,6 +100,7 @@ def search(request):
             "search_results.html",
             {
                 "items": None,
+                "sites": SiteName.labels,
             },
         )
 
@@ -150,7 +152,7 @@ def search(request):
             ),
             "categories": ["book", "movie", "music", "game"],
             "sites": SiteName.labels,
-            "hide_category": category is not None,
+            "hide_category": category is not None and category != "movietv",
         },
     )
 

@@ -156,12 +156,6 @@ class Content(Piece):
     metadata = models.JSONField(default=dict)
     item = models.ForeignKey(Item, on_delete=models.PROTECT)
 
-    @cached_property
-    def mark(self):
-        m = Mark(self.owner, self.item)
-        m.review = self
-        return m
-
     def __str__(self):
         return f"{self.uuid}@{self.item}"
 
@@ -221,6 +215,16 @@ class Comment(Content):
     def html(self):
         return render_text(self.text)
 
+    @cached_property
+    def rating_grade(self):
+        return Rating.get_item_rating_by_user(self.item, self.owner)
+
+    @cached_property
+    def mark(self):
+        m = Mark(self.owner, self.item)
+        m.comment = self
+        return m
+
     @property
     def item_url(self):
         if self.focus_item:
@@ -259,6 +263,19 @@ class Review(Content):
     def html_content(self):
         return render_md(self.body)
 
+    @property
+    def plain_content(self):
+        html = render_md(self.body)
+        return _RE_HTML_TAG.sub(
+            " ", _RE_SPOILER_TAG.sub("***", html.replace("\n", " "))
+        )
+
+    @cached_property
+    def mark(self):
+        m = Mark(self.owner, self.item)
+        m.review = self
+        return m
+
     @cached_property
     def rating_grade(self):
         return Rating.get_item_rating_by_user(self.item, self.owner)
@@ -291,6 +308,9 @@ class Review(Content):
         return review
 
 
+MIN_RATING_COUNT = 5
+
+
 class Rating(Content):
     class Meta:
         unique_together = [["owner", "item"]]
@@ -304,7 +324,7 @@ class Rating(Content):
         stat = Rating.objects.filter(item=item, grade__isnull=False).aggregate(
             average=Avg("grade"), count=Count("item")
         )
-        return round(stat["average"], 1) if stat["count"] >= 5 else None
+        return round(stat["average"], 1) if stat["count"] >= MIN_RATING_COUNT else None
 
     @staticmethod
     def get_rating_count_for_item(item):
@@ -337,9 +357,34 @@ class Rating(Content):
         rating = Rating.objects.filter(owner=user, item=item).first()
         return rating.grade if rating else None
 
+    @staticmethod
+    def get_rating_distribution_for_item(item):
+        stat = (
+            Rating.objects.filter(item=item, grade__isnull=False)
+            .values("grade")
+            .annotate(count=Count("grade"))
+            .order_by("grade")
+        )
+        g = [0] * 11
+        t = 0
+        for s in stat:
+            g[s["grade"]] = s["count"]
+            t += s["count"]
+        if t < MIN_RATING_COUNT:
+            return [0] * 5
+        r = [
+            100 * (g[1] + g[2]) // t,
+            100 * (g[3] + g[4]) // t,
+            100 * (g[5] + g[6]) // t,
+            100 * (g[7] + g[8]) // t,
+            100 * (g[9] + g[10]) // t,
+        ]
+        return r
+
 
 Item.rating = property(Rating.get_rating_for_item)
 Item.rating_count = property(Rating.get_rating_count_for_item)
+Item.rating_dist = property(Rating.get_rating_distribution_for_item)
 
 
 class Reply(Piece):
@@ -439,6 +484,17 @@ class List(Piece):
                 sender=self.__class__, instance=self, item=item, member=member
             )
             member.delete()
+
+    def update_member_order(self, ordered_member_ids):
+        members = self.ordered_members
+        for m in self.members.all():
+            try:
+                i = ordered_member_ids.index(m.id)
+                if m.position != i + 1:
+                    m.position = i + 1
+                    m.save()
+            except ValueError:
+                pass
 
     def move_up_item(self, item):
         members = self.ordered_members
@@ -674,8 +730,11 @@ class ShelfManager:
     def get_shelf(self, shelf_type):
         return self.shelf_list[shelf_type]
 
-    def get_members(self, shelf_type, item_category):
-        return self.shelf_list[shelf_type].get_members_in_category(item_category)
+    def get_members(self, shelf_type, item_category=None):
+        if item_category:
+            return self.shelf_list[shelf_type].get_members_in_category(item_category)
+        else:
+            return self.shelf_list[shelf_type].members.all()
 
     # def get_items_on_shelf(self, item_category, shelf_type):
     #     shelf = (
@@ -748,6 +807,7 @@ class CollectionMember(ListMember):
 
 
 _RE_HTML_TAG = re.compile(r"<[^>]*>")
+_RE_SPOILER_TAG = re.compile(r'<(div|span)\sclass="spoiler">.*</(div|span)>')
 
 
 class Collection(List):
@@ -781,8 +841,9 @@ class Collection(List):
         html = render_md(self.brief)
         return _RE_HTML_TAG.sub(" ", html)
 
-    def is_featured_by_user(self, user):
-        return self.featured_by_users.all().filter(id=user.id).exists()
+    def featured_by_user_since(self, user):
+        f = FeaturedCollection.objects.filter(target=self, owner=user).first()
+        return f.created_time if f else None
 
     def get_stats_for_user(self, user):
         items = list(self.members.all().values_list("item_id", flat=True))
@@ -881,13 +942,15 @@ class TagManager:
         return sorted(list(map(lambda t: t["title"], tags)))
 
     @staticmethod
-    def all_tags_for_user(user):
+    def all_tags_for_user(user, public_only=False):
         tags = (
             user.tag_set.all()
             .values("title")
             .annotate(frequency=Count("members__id"))
             .order_by("-frequency")
         )
+        if public_only:
+            tags = tags.filter(visibility=0)
         return list(map(lambda t: t["title"], tags))
 
     @staticmethod
@@ -934,6 +997,10 @@ class TagManager:
     @property
     def all_tags(self):
         return TagManager.all_tags_for_user(self.owner)
+
+    @property
+    def public_tags(self):
+        return TagManager.all_tags_for_user(self.owner, public_only=True)
 
     def add_item_tags(self, item, tags, visibility=0):
         for tag in tags:
@@ -1022,6 +1089,10 @@ class Mark:
         return Rating.get_item_rating_by_user(self.item, self.owner)
 
     @cached_property
+    def rating_grade(self):
+        return Rating.get_item_rating_by_user(self.item, self.owner)
+
+    @cached_property
     def comment(self):
         return Comment.objects.filter(
             owner=self.owner, item=self.item, focus_item__isnull=True
@@ -1059,7 +1130,8 @@ class Mark:
             )
         )
         share_as_new_post = shelf_type != self.shelf_type
-        if shelf_type != self.shelf_type or visibility != self.visibility:
+        original_visibility = self.visibility
+        if shelf_type != self.shelf_type or visibility != original_visibility:
             self.shelfmember = self.owner.shelf_manager.move_item(
                 self.item, shelf_type, visibility=visibility, metadata=metadata
             )
@@ -1082,11 +1154,11 @@ class Mark:
                     metadata=self.metadata,
                     timestamp=created_time,
                 )
-        if comment_text != self.text or visibility != self.visibility:
+        if comment_text != self.text or visibility != original_visibility:
             self.comment = Comment.comment_item_by_user(
                 self.item, self.owner, comment_text, visibility
             )
-        if rating_grade != self.rating or visibility != self.visibility:
+        if rating_grade != self.rating or visibility != original_visibility:
             Rating.rate_item_by_user(self.item, self.owner, rating_grade, visibility)
             self.rating = rating_grade
         if share:
@@ -1120,7 +1192,7 @@ class Mark:
         )
 
 
-def reset_visibility_for_user(user: User, visibility: int):
+def reset_journal_visibility_for_user(user: User, visibility: int):
     ShelfMember.objects.filter(owner=user).update(visibility=visibility)
     Comment.objects.filter(owner=user).update(visibility=visibility)
     Rating.objects.filter(owner=user).update(visibility=visibility)

@@ -6,14 +6,23 @@ from .api import api
 
 
 @login_required
+def me(request):
+    return redirect(
+        reverse("journal:user_profile", args=[request.user.mastodon_username])
+    )
+
+
 def home(request):
-    home = request.user.get_preference().classic_homepage
-    if home == 1:
-        return redirect(
-            reverse("journal:user_profile", args=[request.user.mastodon_username])
-        )
-    elif home == 2:
-        return redirect(reverse("social:feed"))
+    if request.user.is_authenticated:
+        home = request.user.get_preference().classic_homepage
+        if home == 1:
+            return redirect(
+                reverse("journal:user_profile", args=[request.user.mastodon_username])
+            )
+        elif home == 2:
+            return redirect(reverse("social:feed"))
+        else:
+            return redirect(reverse("catalog:discover"))
     else:
         return redirect(reverse("catalog:discover"))
 

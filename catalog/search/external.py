@@ -16,19 +16,22 @@ class SearchResultItem:
         self, category, source_site, source_url, title, subtitle, brief, cover_url
     ):
         self.category = category
+        self.external_resources = {
+            "all": [{"url": source_url, "site_name": {"label": source_site}}]
+        }
         self.source_site = source_site
         self.source_url = source_url
         self.title = title
         self.subtitle = subtitle
         self.brief = brief
-        self.cover_url = cover_url
+        self.cover_image_url = cover_url
 
     @property
     def verbose_category_name(self):
         return self.category.label
 
     @property
-    def link(self):
+    def url(self):
         return f"/search?q={quote_plus(self.source_url)}"
 
     @property
@@ -272,7 +275,7 @@ class ExternalSources:
         results = []
         if c == "" or c is None:
             c = "all"
-        if c == "all" or c == "movie" or c == "tv":
+        if c == "all" or c == "movietv":
             results.extend(TheMovieDatabase.search(q, page))
         if c == "all" or c == "book":
             results.extend(GoogleBooks.search(q, page))

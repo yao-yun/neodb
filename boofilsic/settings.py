@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/3.0/ref/settings/
 
 import os
 
+PROJECT_ROOT = os.path.abspath(os.path.dirname(__name__))
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -52,6 +53,7 @@ INSTALLED_APPS = [
     "django_rq",
     "django_bleach",
     "tz_detect",
+    "sass_processor",
     "simple_history",
     "markdownx",
     "polymorphic",
@@ -210,6 +212,11 @@ STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "static/")
 
 STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
+STATICFILES_FINDERS = [
+    "django.contrib.staticfiles.finders.FileSystemFinder",
+    "django.contrib.staticfiles.finders.AppDirectoriesFinder",
+    "sass_processor.finders.CssFinder",
+]
 
 AUTH_USER_MODEL = "users.User"
 
@@ -221,9 +228,9 @@ SILENCED_SYSTEM_CHECKS = [
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media/")
 
-PROJECT_ROOT = os.path.abspath(os.path.dirname(__name__))
 SITE_INFO = {
     "site_name": "NiceDB",
+    "site_url": "https://nicedb.org",
     "support_link": "https://github.com/doubaniux/boofilsic/issues",
     "social_link": "https://donotban.com/@testie",
     "donation_link": "https://patreon.com/tertius",
@@ -237,6 +244,7 @@ CLIENT_NAME = os.environ.get("APP_NAME", "NiceDB")
 SITE_INFO["site_name"] = os.environ.get("APP_NAME", "NiceDB")
 APP_WEBSITE = os.environ.get("APP_URL", "https://nicedb.org")
 REDIRECT_URIS = APP_WEBSITE + "/users/OAuth2_login/"
+SITE_INFO["site_url"] = APP_WEBSITE
 
 
 # Path to save report related images, ends with slash
@@ -408,3 +416,5 @@ MAINTENANCE_MODE_IGNORE_ADMIN_SITE = True
 MAINTENANCE_MODE_IGNORE_SUPERUSER = True
 MAINTENANCE_MODE_IGNORE_ANONYMOUS_USER = True
 MAINTENANCE_MODE_IGNORE_URLS = (r"^/users/connect/", r"^/users/OAuth2_login/")
+
+DISCORD_WEBHOOKS = {}

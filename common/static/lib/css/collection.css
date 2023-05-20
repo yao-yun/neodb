@@ -180,8 +180,8 @@ div.jsoneditor-menu {
 }
 
 .donut {
-  margin-left: 20%;
-  width: 60%;
+  margin-left: 10%;
+  width: 80%;
   aspect-ratio : 1 / 1;
   border-radius: 50%;
   display: flex;
@@ -198,7 +198,7 @@ div.jsoneditor-menu {
   justify-content: center;
 }
 
-progress {
+/* progress {
   border-radius: 7px;
   width: 80%;
   height: 10px;
@@ -209,7 +209,7 @@ progress {
 }
 ::-webkit-progress-value {
   background-color: #00a1cc;
-}
+} */
 
 .markdownx-editor {
   font-family: monospace;
@@ -266,6 +266,6 @@ summary::-webkit-details-marker {
     transform: rotate(360deg);
 }
 
-.fa-lock, .fa-spin {
+.action-bar .fa-lock, .fa-spin {
     color: lightgray;
 }
