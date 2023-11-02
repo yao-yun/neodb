@@ -6,6 +6,7 @@ django-anymail
 django-auditlog>=3.0.0-beta.2
 django-bleach
 django-compressor
+django-cors-headers
 django-environ
 django-hijack
 django-jsonform

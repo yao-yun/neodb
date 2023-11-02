@@ -269,7 +269,7 @@ def detect_server_info(login_domain):
     return domain, api_domain, server_version
 
 
-def get_mastodon_application(login_domain):
+def get_or_create_fediverse_application(login_domain):
     domain = login_domain
     app = MastodonApplication.objects.filter(domain_name__iexact=domain).first()
     if not app:

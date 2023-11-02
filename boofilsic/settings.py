@@ -249,6 +249,7 @@ INSTALLED_APPS = [
     "polymorphic",
     "easy_thumbnails",
     "user_messages",
+    "corsheaders",
     "anymail",
     # "silk",
 ]
@@ -274,6 +275,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     # "silk.middleware.SilkyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -484,4 +486,17 @@ OAUTH2_PROVIDER_APPLICATION_MODEL = "developer.Application"
 
 DEVELOPER_CONSOLE_APPLICATION_CLIENT_ID = "NEODB_DEVELOPER_CONSOLE"
 
+# https://github.com/adamchainz/django-cors-headers#configuration
+# CORS_ALLOWED_ORIGINS = []
+# CORS_ALLOWED_ORIGIN_REGEXES = []
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_URLS_REGEX = r"^/api/.*$"
+CORS_ALLOW_METHODS = (
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    # "PATCH",
+    "POST",
+    # "PUT",
+)
 DEFAULT_RELAY_SERVER = "https://relay.neodb.net/actor"
