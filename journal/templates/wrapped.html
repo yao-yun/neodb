@@ -1,0 +1,139 @@
+{% load static %}
+{% load i18n %}
+{% load l10n %}
+{% load humanize %}
+{% load admin_url %}
+{% load mastodon %}
+{% load oauth_token %}
+{% load truncate %}
+{% load thumb %}
+{% load collection %}
+{% load user_actions %}
+<!DOCTYPE html>
+<html lang="zh" class="classic-page">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ site_name }} - {{ identity.display_name }} - {{ year }} 年度统计</title>
+    {% include "common_libs.html" %}
+    {% comment %} <script src="https://unpkg.com/rough-viz@2.0.5"></script> {% endcomment %}
+    <script src="{% static 'js/roughviz.umd.js' %}"></script>
+    {% comment %} <script src="{% static 'js/saveSvgAsPng.js' %}"></script> {% endcomment %}
+    <script src="https://cdn.jsdelivr.net/npm/save-svg-as-png@1.4.17/lib/saveSvgAsPng.min.js"></script>
+    <style>
+      .yAxisviz0, .rough-yAxisviz0 {
+        display: none;
+      }
+      .xAxisviz0 {
+        {% comment %} opacity: 0.3; {% endcomment %}
+      }
+    </style>
+  </head>
+  <body>
+    {% include "_header.html" %}
+    <main>
+      <div class="grid__main">
+        <span class="action">
+          <span>
+            <a onclick="restyle()" title="换样子"><i class="fa-solid fa-shuffle"></i></a>
+          </span>
+          <span>
+            <a hx-get="{% url 'journal:wrapped_share' year %}"
+               hx-target="body"
+               hx-swap="beforeend"
+               title="转发到时间轴"><i class="fa-solid fa-share-from-square"></i></a>
+          </span>
+          <span>
+            <a onclick="saveSvgAsPng($('#viz0').children('svg')[0], 'wrapped.png');"
+               title="下载图片"><i class="fa-solid fa-download"></i></a>
+          </span>
+        </span>
+        <h5>{{ year }} 年度统计</h5>
+        <div id="viz0" style="max-width: 100%; aspect-ratio: 1 / 1;"></div>
+        {{ by_cat|json_script:"cat-data" }}
+        {{ monthly|json_script:"mon-data" }}
+        {{ data|json_script:"data" }}
+        <script>
+          var cats = JSON.parse(document.getElementById('cat-data').textContent);
+          var data = JSON.parse(document.getElementById('data').textContent);
+          var opts = {
+            title: "{{ identity.user.mastodon_acct | default:identity.full_handle }} - {{ year }}",
+            element: '#viz0',
+            font: 1,
+            data: data,
+            labels: "Month",
+            highlight: "#666",
+            stackColorMapping:   {
+              '📚': '#B4D2A5',
+              '🎬': '#7CBDFE',
+              '📺': '#FED37C',
+              '💿': '#FEA36D',
+              '🎮': '#C5A290',
+              '🎙️': '#9D6AB0',
+              '🎭': '#FE7C7C',
+              'x': '#FDDB23',
+            },
+            roughness: 1,
+            fillStyle: 'solid',
+            margin: { top: 80, left: 20, right: 20, bottom: 80 },
+            stroke: 1,
+            padding: 0.2,
+            color: 'red',
+            strokeWidth: 1,
+            axisStrokeWidth: 1,
+            innerStrokeWidth: 1,
+            fillWeight: 1,
+            axisRoughness: 1,
+            yLabel:"",
+          };
+          var viz0 = new roughViz.StackedBar(opts);
+          viz0.setTitle = function(title) {
+            $('#viz0').children('svg').css("background-color", "#fbfcfc").css("border-radius", "1rem");
+
+            viz0.svg.append("text")
+            .attr("x", viz0.width / 2)
+            .attr("y", 0 - viz0.margin.top / 2)
+            .attr("class", "title")
+            .attr("text-anchor", "middle")
+            .style( "font-size", 20)
+            .style( "font-weight", "bold" )
+            .style("font-family", viz0.fontFamily)
+            .style("color", "#000")
+            .text(title);
+
+            viz0.svg.append("text")
+            .attr("x", viz0.width / 2)
+            .attr("y", viz0.height + viz0.margin.top -30)
+            .attr("class", "title")
+            .attr("text-anchor", "middle")
+            .style( "font-size", 20 )
+            .style("font-family", viz0.fontFamily)
+            .style("color", "#000")
+            .text(cats);
+
+            viz0.svg.append("text")
+            .attr("x", viz0.width)
+            .attr("y", viz0.height + viz0.margin.top -10)
+            .attr("class", "title")
+            .attr("text-anchor", "end")
+            .style( "font-size", 10 )
+            .style("font-family", viz0.fontFamily)
+            .style("color", "#666")
+            .text("{{ identity.profile_uri }}");
+          };
+          if ($('#viz0')[0].clientHeight < 250) {
+              $('#viz0')[0].style.height = $('#viz0')[0].clientWidth + 'px';
+          }
+          viz0.boundRedraw()
+          function restyle() {
+            opts.roughness = Math.random()*4;
+            opts.fillStyle = ["hachure", "solid", "zigzag", "cross-hatch", "dashed", "zigzag-line"][Math.floor(Math.random() * 6)];
+            viz0.redraw(opts);
+          }
+        </script>
+      </div>
+      {% include "_sidebar.html" with show_profile=1 %}
+    </main>
+    {% include "_footer.html" %}
+  </body>
+</html>
