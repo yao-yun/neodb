@@ -141,6 +141,10 @@ class Takahe:
 
     @staticmethod
     def fetch_remote_identity(handler: str) -> int | None:
+        d = handler.split("@")[-1]
+        domain = Domain.objects.filter(domain=d).first()
+        if domain and domain.recursively_blocked:
+            return
         InboxMessage.create_internal({"type": "FetchIdentity", "handle": handler})
 
     @staticmethod
@@ -670,7 +674,9 @@ class Takahe:
         return FediverseHtmlParser(linebreaks_filter(txt)).html
 
     @staticmethod
-    def update_state(obj: Post | PostInteraction | Relay | Identity, state: str):
+    def update_state(
+        obj: Post | PostInteraction | Relay | Identity | Domain, state: str
+    ):
         obj.state = state
         obj.state_changed = timezone.now()
         obj.state_next_attempt = None
@@ -696,6 +702,7 @@ class Takahe:
                     nodeinfo__protocols__contains="neodb",
                     nodeinfo__metadata__nodeEnvironment="production",
                     local=False,
+                    blocked=False,
                 ).values_list("pk", flat=True)
             )
             cache.set(cache_key, peers, timeout=1800)
