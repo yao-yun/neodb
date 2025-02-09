@@ -21,6 +21,7 @@ from journal.importers import (
     LetterboxdImporter,
     NdjsonImporter,
     OPMLImporter,
+    SteamImporter
 )
 from journal.models import ShelfType
 from takahe.utils import Takahe
@@ -395,4 +396,39 @@ def import_neodb(request):
         )
         task.enqueue()
         return redirect(reverse("users:user_task_status", args=(task.type,)))
+    return redirect(reverse("users:data"))
+
+@login_required
+def import_steam(request):
+    if request.method != "POST":
+        return redirect(reverse("users:data"))
+
+    steam_apikey = request.POST.get("steam_apikey")
+    steam_id = request.POST.get("steam_id")
+
+    if not SteamImporter.validate_apikey(steam_apikey):
+        messages.add_message(request, messages.ERROR, _("Invalid API key."))
+        return redirect(reverse("users:data"))
+    if not SteamImporter.validate_userid(steam_id):
+        messages.add_message(request, messages.ERROR, _("Invalid steam id."))
+        return redirect(reverse("users:data"))
+
+    fetch_wishlist = bool(request.POST.get("fetch_wishlist", True))
+    fetch_owned = bool(request.POST.get("fetch_owned", True))
+
+    if not (fetch_wishlist or fetch_owned):
+        messages.add_message(request, messages.ERROR, _("Nothing to fetch."))
+        return redirect(reverse("users:data"))
+
+    SteamImporter.create(
+        user=request.user,
+        shelf_type_reversion = bool(request.POST.get("shelf_type_reversion", False)),
+        fetch_wishlist = fetch_wishlist,
+        fetch_owned = fetch_owned,
+        last_play_to_ctime = bool(request.POST.get("last_play_to_ctime", True)),
+        visibility = int(request.POST.get("visibility", request.user.visibility)),
+        steam_apikey = steam_apikey,
+        steam_id = steam_id
+    ).enqueue()
+    messages.add_message(request, messages.INFO, _("Import in progress."))
     return redirect(reverse("users:data"))

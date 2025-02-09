@@ -234,6 +234,14 @@ class SteamImporter(Task):
         elif played_long_enough: return ShelfType.COMPLETE
         else: return ShelfType.DROPPED
 
+    @classmethod
+    def validate_apikey(cls, steam_apikey: str) -> bool:
+        ...
+
+    @classmethod
+    def validate_userid(cls, steam_id: str) -> bool:
+        ...
+
     # TODO: Implement get_how_long_to_beat:
     # Such data are available in HowLongToBeat.com and igdb, however
     # 1. time_to_beat can be considered a potential metadata of Game item,
