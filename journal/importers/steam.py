@@ -132,10 +132,10 @@ class SteamImporter(Task):
         res = webapi.call(
             "IWishlistService.GetWishlist",
             steamid=steam_id
-        )
+        )["response"]
 
         wishlist_rawmarks: List[RawGameMark] = []
-        for entry in res:
+        for entry in res["items"]:
             item = self.get_item_by_id(entry["appid"])
             created_time = datetime.fromtimestamp(entry["date_added"])
             if item is not None:
@@ -177,9 +177,10 @@ class SteamImporter(Task):
             include_free_sub=True,
             language="en",
             include_extended_appinfo=True,
-        )
+        )["response"]
+
         owned_rawmarks: List[RawGameMark] = []
-        for entry in res:
+        for entry in res["games"]:
             item = self.get_item_by_id(entry["appid"])
             if estimate_shelf_type:
                 shelf_type = SteamImporter.estimate_shelf_type(entry["playtime_forever"], datetime.fromtimestamp(entry["rtime_last_played"]), entry["appid"])
@@ -225,8 +226,8 @@ class SteamImporter(Task):
     def estimate_shelf_type(cls, playtime_forever: int, last_played: datetime, app_id: str):
         played_long_enough = playtime_forever / SteamImporter.get_how_long_to_beat(app_id) > .75
         never_played = playtime_forever == 0 and last_played == datetime.fromtimestamp(0)
-        playing = datetime.now() - last_played > timedelta(weeks=2)
-        # if not pleyed for 2 weeks then deemed as not playing
+        playing = datetime.now() - last_played < timedelta(weeks=2)
+        # ever played in 2 weeks
 
         if never_played: return ShelfType.WISHLIST # we all have games purchased and never played...
         elif playing: return ShelfType.PROGRESS
