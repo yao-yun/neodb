@@ -171,6 +171,89 @@
         </article>
         <article>
           <details>
+            <summary>{% trans 'Import from Steam Wishlist / Library (owned games only)' %}</summary>
+            <form action="{% url 'users:import_steam' %}" method="post">
+              {% csrf_token %}
+              <div>
+                {% trans 'Steam API Key' %}
+                <br>
+                <small>
+                  <a href="https://steamcommunity.com/dev/apikey"
+                     target="_blank"
+                     rel="noopener noreferrer">{% trans 'Get it here' %}</a>
+                </small>
+                <input type="str"
+                       name="steam_apikey"
+                       value=""
+                       placeholder="1A23B456C7890D9AS9D734BI3IB12943"
+                       required>
+                {% trans 'Steam User ID' %}
+                <br>
+                <small>
+                  {% trans 'Find as \'Steam ID: ...\' in ' %} <a href="https://store.steampowered.com/account/" target="_blank" rel="noopener noreferrer">{% trans 'Account Details' %}</a>
+                </small>
+                <input type="str"
+                       name="steam_id"
+                       value=""
+                       placeholder="0123456789101112"
+                       required>
+              </div>
+              <p>
+                {% trans 'To import...' %}:
+                <br>
+                <label for="id_import_wishlist">
+                  <input type="checkbox"
+                         name="fetch_wishlist"
+                         value="True"
+                         required=""
+                         id="id_import_wishlist"
+                         checked>
+                  {% trans 'Wishlist' %}
+                </label>
+                <label for="id_import_owned">
+                  <input type="checkbox"
+                         name="fetch_owned"
+                         value="True"
+                         required=""
+                         id="id_import_owned">
+                  {% trans 'Owned games in library' %}
+                </label>
+              </p>
+              <p>
+                {% trans 'Visibility' %}:
+                <br>
+                <label for="id_visibility_0">
+                  <input type="radio"
+                         name="visibility"
+                         value="0"
+                         required=""
+                         id="id_visibility_0"
+                         checked>
+                  {% trans 'Public' %}
+                </label>
+                <label for="id_visibility_1">
+                  <input type="radio"
+                         name="visibility"
+                         value="1"
+                         required=""
+                         id="id_visibility_1">
+                  {% trans 'Followers Only' %}
+                </label>
+                <label for="id_visibility_2">
+                  <input type="radio"
+                         name="visibility"
+                         value="2"
+                         required=""
+                         id="id_visibility_2">
+                  {% trans 'Mentioned Only' %}
+                </label>
+              </p>
+              <input type="submit"  value="{% trans 'Import' %}" />
+            </form>
+          </details>
+        </article>
+        <article>
+          <details>
             <summary>{% trans 'Import Podcast Subscriptions' %}</summary>
             <form hx-post="{% url 'users:import_opml' %}" enctype="multipart/form-data">
               {% csrf_token %}

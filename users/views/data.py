@@ -11,6 +11,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone, translation
 from django.utils.translation import gettext as _
+import requests
 
 from common.utils import GenerateDateUUIDMediaFilePath
 from journal.exporters import CsvExporter, DoufenExporter, NdjsonExporter
@@ -406,12 +407,15 @@ def import_steam(request):
     steam_apikey = request.POST.get("steam_apikey")
     steam_id = request.POST.get("steam_id")
 
-    if not SteamImporter.validate_apikey(steam_apikey):
-        messages.add_message(request, messages.ERROR, _("Invalid API key."))
-        return redirect(reverse("users:data"))
-    if not SteamImporter.validate_userid(steam_id):
-        messages.add_message(request, messages.ERROR, _("Invalid steam id."))
-        return redirect(reverse("users:data"))
+    try:
+        if not SteamImporter.validate_apikey(steam_apikey):
+            messages.add_message(request, messages.ERROR, _(f"Invalid API key: {steam_apikey}."))
+            return redirect(reverse("users:data"))
+        if not SteamImporter.validate_userid(steam_apikey, steam_id):
+            messages.add_message(request, messages.ERROR, _("Invalid steam id."))
+            return redirect(reverse("users:data"))
+    except requests.RequestException:
+        messages.add_message(request, messages.ERROR, _("Network error validating apikey / userid"))
 
     fetch_wishlist = bool(request.POST.get("fetch_wishlist", True))
     fetch_owned = bool(request.POST.get("fetch_owned", True))
@@ -426,7 +430,7 @@ def import_steam(request):
         fetch_wishlist = fetch_wishlist,
         fetch_owned = fetch_owned,
         last_play_to_ctime = bool(request.POST.get("last_play_to_ctime", True)),
-        visibility = int(request.POST.get("visibility", request.user.visibility)),
+        visibility = int(request.POST.get("visibility", request.user.preference.default_visibility)),
         steam_apikey = steam_apikey,
         steam_id = steam_id
     ).enqueue()
