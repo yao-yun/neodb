@@ -309,11 +309,16 @@
                            value="steam_timestamp"
                            checked>
                     {% trans 'Using timestamp from Steam' %}
-                    <select name="timezone" x-bind:disabled="mark_date !== 'steam_timestamp'">
-                      <option>UTC</option>
-                      <option>EST</option>
-                      <option>PST</option>
-                    </select>
+                    <input name="timezone"
+                           placeholder="Asia/Shanghai"
+                           x-bind:disabled="mark_date !== 'steam_timestamp'"
+                           required>
+                    <small>
+                      {% trans 'Input the most often timezone that you play games in this library, for us to convert the local time stored by Steam.' %}
+                      <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"
+                         target="_blank"
+                         rel="noopener noreferrer">{% trans 'reference' %}</a>
+                    </small>
                   </label>
                 </div>
               </div>
