@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Iterable, List, TypedDict
 from datetime import datetime, timedelta
 
@@ -41,6 +42,7 @@ class SteamImporter(Task):
         fetch_owned: bool
         last_play_to_ctime: bool # False: use current time
         shelf_filter: List[ShelfType]
+        owned_filter: str
         ignored_appids: List[str]
         steam_tz: str
         total: int
@@ -60,6 +62,7 @@ class SteamImporter(Task):
         "fetch_owned": True,
         "last_play_to_ctime": True,
         "shelf_filter": [ShelfType.COMPLETE, ShelfType.DROPPED, ShelfType.PROGRESS, ShelfType.WISHLIST],
+        "owned_filter": "played_free",
         "ignored_appids": [],
         "steam_tz": "UTC",
         "total": 0,
@@ -180,9 +183,9 @@ class SteamImporter(Task):
             "key": self.metadata["steam_apikey"],
             "steamid": str(self.metadata["steam_id"]),
             "include_appinfo": False,
-            "include_played_free_games": True,
+            "include_played_free_games": self.metadata["owned_filter"] != "no_free",
             "appids_filter": [],
-            "include_free_sub": True,
+            "include_free_sub": self.metadata["owned_filter"] == "all_free",
             "language": "en", # appinfo not used, so this is no use
             "include_extended_appinfo": False,
         }
