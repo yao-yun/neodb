@@ -1,9 +1,10 @@
-from typing import Iterable, List, Optional, TypedDict
+from typing import Iterable, List, TypedDict
 from datetime import datetime, timedelta
 
 import logging
 import pytz
-from requests import HTTPError
+from requests import HTTPError, request
+import requests
 from catalog.common.downloaders import DownloadError
 from catalog.common.models import IdType, Item
 from catalog.common.sites import SiteManager
@@ -11,7 +12,6 @@ from journal.models.common import VisibilityType
 from journal.models.mark import Mark
 from journal.models.shelf import ShelfType
 from users.models import Task
-from steam.webapi import WebAPI
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -23,9 +23,10 @@ logger = logging.getLogger(__name__)
 # Get played (owned) games from IPlayerService.GetOwnedGames
 # Get wishlist games from IWishlistService/GetWishlist
 # TODO: asynchronous item loading
-# TODO: remove dep on steam pkg, replace steam api with simple request
 # TODO: implement get_time_to_beat with igdb
 # TODO: log: use logging, loguru, or auditlog?
+
+STEAM_API_BASE_URL = "https://api.steampowered.com"
 
 class RawGameMark(TypedDict):
     app_id: str
@@ -149,16 +150,17 @@ class SteamImporter(Task):
 
         :return: Parsed list of raw game marked
         """
-        steam_apikey: str = self.metadata["steam_apikey"]
-        steam_id: str = self.metadata["steam_id"]
-        webapi = WebAPI(steam_apikey)
+        url = f"{STEAM_API_BASE_URL}/IWishlistService/GetWishlist/v1/"
+        params = {
+            "key": self.metadata["steam_apikey"],
+            "steamid": self.metadata["steam_id"],
+        }
 
-        res = webapi.call(
-            "IWishlistService.GetWishlist",
-            steamid=steam_id
-        )["response"]
+        res = requests.get(url, params)
+        if res.status_code != 200:
+            logger.error("Network error when getting wishlist.")
 
-        for entry in res["items"]:
+        for entry in res.json()["response"]["items"]:
             created_time = datetime.fromtimestamp(entry["date_added"])
             yield {
                 "app_id": str(entry["appid"]),
@@ -173,23 +175,23 @@ class SteamImporter(Task):
 
         :return: Parsed list of raw game marked
         """
-        steam_apikey: str = self.metadata["steam_apikey"]
-        steam_id: str = self.metadata["steam_id"]
-        webapi = WebAPI(steam_apikey)
+        url = f"{STEAM_API_BASE_URL}/IPlayerService/GetOwnedGames/v1/"
+        params = {
+            "key": self.metadata["steam_apikey"],
+            "steamid": str(self.metadata["steam_id"]),
+            "include_appinfo": False,
+            "include_played_free_games": True,
+            "appids_filter": [],
+            "include_free_sub": True,
+            "language": "en", # appinfo not used, so this is no use
+            "include_extended_appinfo": False,
+        }
 
-        res = webapi.call(
-            "IPlayerService.GetOwnedGames",
-            format="json",
-            steamid=steam_id,
-            include_appinfo=False,
-            include_played_free_games=True,
-            appids_filter=[],
-            include_free_sub=True,
-            language="en", # appinfo not used, so this is no use
-            include_extended_appinfo=False,
-        )["response"]
+        res = requests.get(url, params)
+        if res.status_code != 200:
+            logger.error("Network error when getting owned games.")
 
-        for entry in res["games"]:
+        for entry in res.json()["response"]["games"]:
             rtime_last_played = datetime.fromtimestamp(entry["rtime_last_played"])
             playtime_forever = entry["playtime_forever"]
             app_id = str(entry["appid"])
@@ -242,9 +244,12 @@ class SteamImporter(Task):
     @classmethod
     def validate_apikey(cls, steam_apikey: str) -> bool:
         logger.debug(f"Validating api key: {steam_apikey}")
+        url = f"{STEAM_API_BASE_URL}/ISteamWebAPIUtil/GetSupportedAPIList/v1/"
+        params = {
+            "key": steam_apikey,
+        }
         try:
-            webapi = WebAPI(steam_apikey)
-            interfaces = webapi.call("ISteamWebAPIUtil.GetSupportedAPIList")["apilist"]["interfaces"]
+            interfaces = requests.get(url, params).json()["apilist"]["interfaces"]
             method_names = [method["name"] for interface in interfaces for method in interface["methods"]]
             # logger.debug(f"Methods available: {method_names}")
             return "GetOwnedGames" in method_names
@@ -258,9 +263,13 @@ class SteamImporter(Task):
     @classmethod
     def validate_userid(cls, steam_apikey: str, steam_id: str) -> bool:
         logger.debug(f"Validating steam_id: {steam_id}")
+        url = f"{STEAM_API_BASE_URL}/ISteamUser/GetPlayerSummaries/v2/"
+        params = {
+            "key": steam_apikey,
+            "steamids": steam_id,
+        }
         try:
-            webapi = WebAPI(steam_apikey)
-            players = webapi.call("ISteamUser.GetPlayerSummaries", steamids = steam_id)["response"]["players"]
+            players = requests.get(url, params).json()["response"]["players"]
             return players != []
         except HTTPError as e:
             if e.response.status_code == [401, 403]:
