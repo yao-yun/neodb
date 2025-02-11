@@ -26,12 +26,6 @@ logger = logging.getLogger(__name__)
 # TODO: remove dep on steam pkg, replace steam api with simple request
 # TODO: implement get_time_to_beat with igdb
 # TODO: log: use logging, loguru, or auditlog?
-# TODO: add option:
-#       - shelf filter: subset of ShelfType
-#       - owned games filter:
-#           - all free games / played free games / no free games
-#           - list of app_id to ignore
-#       - Most played TZ
 
 class RawGameMark(TypedDict):
     app_id: str
@@ -45,6 +39,9 @@ class SteamImporter(Task):
         fetch_wishlist: bool
         fetch_owned: bool
         last_play_to_ctime: bool # False: use current time
+        shelf_filter: List[ShelfType]
+        ignored_appids: List[str]
+        steam_tz: str
         total: int
         skipped: int
         processed: int
@@ -52,8 +49,8 @@ class SteamImporter(Task):
         imported: int
         visibility: VisibilityType
         failed_appids: List[str]
-        steam_apikey: Optional[str]
-        steam_id: Optional[int]
+        steam_apikey: str
+        steam_id: str
 
     TaskQueue = "import"
     DefaultMetadata: MetaData = {
@@ -61,6 +58,9 @@ class SteamImporter(Task):
         "fetch_wishlist": True,
         "fetch_owned": True,
         "last_play_to_ctime": True,
+        "shelf_filter": [ShelfType.COMPLETE, ShelfType.DROPPED, ShelfType.PROGRESS, ShelfType.WISHLIST],
+        "ignored_appids": [],
+        "steam_tz": "UTC",
         "total": 0,
         "skipped": 0,
         "processed": 0,
@@ -68,9 +68,10 @@ class SteamImporter(Task):
         "imported": 0,
         "visibility": VisibilityType.Private,
         "failed_appids": [],
-        "steam_apikey": None,
-        "steam_id": None
+        "steam_apikey": "",
+        "steam_id": ""
     }
+    metadata: MetaData
 
     def run(self):
         """
@@ -81,6 +82,14 @@ class SteamImporter(Task):
         fetched_raw_marks: List[RawGameMark] = []
         if self.metadata["fetch_wishlist"]: fetched_raw_marks.extend(self.get_wishlist_games())
         if self.metadata["fetch_owned"]: fetched_raw_marks.extend(self.get_owned_games())
+        # filter out by shelftype and appid
+        fetched_raw_marks = [
+            raw_mark for raw_mark in fetched_raw_marks
+            if (
+                raw_mark["shelf_type"] in self.metadata["shelf_filter"]
+                and raw_mark["app_id"] not in self.metadata["ignored_appids"]
+            )
+        ]
         self.metadata["total"] = len(fetched_raw_marks)
         logger.debug(f"{self.metadata["total"]} raw marks fetched: {fetched_raw_marks}")
 
@@ -125,9 +134,7 @@ class SteamImporter(Task):
                 mark.update(
                     shelf_type=raw_mark['shelf_type'],
                     visibility=self.metadata["visibility"],
-                    # FIX: the returned timestamp is *the local time of last play*, thus is tz naive
-                    # one way is to let user submit their 'main' tz when playing the games, ugh...
-                    created_time=raw_mark['created_time'].replace(tzinfo=pytz.UTC)
+                    created_time=raw_mark['created_time'].replace(tzinfo=pytz.timezone(self.metadata["steam_tz"]))
                 )
                 logger.debug(f"Mark updated: {mark}")
                 self.metadata["imported"] += 1;
@@ -143,7 +150,7 @@ class SteamImporter(Task):
         :return: Parsed list of raw game marked
         """
         steam_apikey: str = self.metadata["steam_apikey"]
-        steam_id: int = self.metadata["steam_id"]
+        steam_id: str = self.metadata["steam_id"]
         webapi = WebAPI(steam_apikey)
 
         res = webapi.call(
@@ -167,7 +174,7 @@ class SteamImporter(Task):
         :return: Parsed list of raw game marked
         """
         steam_apikey: str = self.metadata["steam_apikey"]
-        steam_id: int = self.metadata["steam_id"]
+        steam_id: str = self.metadata["steam_id"]
         webapi = WebAPI(steam_apikey)
 
         res = webapi.call(
@@ -239,10 +246,10 @@ class SteamImporter(Task):
             webapi = WebAPI(steam_apikey)
             interfaces = webapi.call("ISteamWebAPIUtil.GetSupportedAPIList")["apilist"]["interfaces"]
             method_names = [method["name"] for interface in interfaces for method in interface["methods"]]
-            logger.debug(f"Methods available: {method_names}")
+            # logger.debug(f"Methods available: {method_names}")
             return "GetOwnedGames" in method_names
         except HTTPError as e:
-            if e.response.status_code == 401:
+            if e.response.status_code in [401, 403] :
                 logger.error(f"Invalid apikey")
                 return False
             else:
@@ -250,12 +257,13 @@ class SteamImporter(Task):
 
     @classmethod
     def validate_userid(cls, steam_apikey: str, steam_id: str) -> bool:
+        logger.debug(f"Validating steam_id: {steam_id}")
         try:
             webapi = WebAPI(steam_apikey)
             players = webapi.call("ISteamUser.GetPlayerSummaries", steamids = steam_id)["response"]["players"]
             return players != []
         except HTTPError as e:
-            if e.response.status_code == 401:
+            if e.response.status_code == [401, 403]:
                 logger.error(f"Invalid apikey")
                 return False
             else:
