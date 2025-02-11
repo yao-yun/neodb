@@ -443,10 +443,11 @@ def import_steam(request):
 
     SteamImporter.create(
         user=request.user,
-        shelf_type_reversion = bool(request.POST.get("shelf_type_reversion", False)),
+        shelf_type_reversion = bool(request.POST.get("shelf_type_reversion")),
         fetch_wishlist = fetch_wishlist,
         fetch_owned = fetch_owned,
-        last_play_to_ctime = bool(request.POST.get("last_play_to_ctime", True)),
+        last_play_to_ctime = bool(request.POST.get("mark_date") != "current_time"),
+        owned_filter = request.POST.get("owned_filter", "played_free"),
         shelf_filter = shelf_filter,
         ignored_appids = ignored_appids,
         steam_tz = tz_str,
