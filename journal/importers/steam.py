@@ -15,12 +15,23 @@ from steam.webapi import WebAPI
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
 # with reference to
 # - https://developer.valvesoftware.com/wiki/Steam_Web_API
 # - https://steamapi.xpaw.me/
 #
 # Get played (owned) games from IPlayerService.GetOwnedGames
 # Get wishlist games from IWishlistService/GetWishlist
+# TODO: asynchronous item loading
+# TODO: remove dep on steam pkg, replace steam api with simple request
+# TODO: implement get_time_to_beat with igdb
+# TODO: log: use logging, loguru, or auditlog?
+# TODO: add option:
+#       - shelf filter: subset of ShelfType
+#       - owned games filter:
+#           - all free games / played free games / no free games
+#           - list of app_id to ignore
+#       - Most played TZ
 
 class RawGameMark(TypedDict):
     app_id: str
