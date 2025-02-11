@@ -53,7 +53,6 @@ dependencies = [
     "atproto>=0.0.55",
     "discord-py>=2.4.0",
     "libsass>=0.23.0",
-    "steam>=1.4.4",
 ]
 
 [tool.rye]
